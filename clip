@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+import os
+import sys
+import re
+import yt_dlp
+
+# Regex to strip ANSI color codes
+ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+# Keep track of finished downloads to avoid duplicate progress lines
+_finished_downloads = set()
+
+def clean_link(link):
+    return re.sub(r"&list=.*", "", link)
+
+def progress_bar_hook(d):
+    key = d.get('filename', id(d))  # unique key per file
+
+    if d['status'] == 'downloading':
+        if key in _finished_downloads:
+            return  # skip printing for already finished files
+
+        # Remove ANSI color codes
+        percent_str = d.get('_percent_str', '0.0%')
+        percent_str = ansi_escape.sub('', percent_str).strip()
+        speed = d.get('_speed_str', '0B/s').strip()
+
+        # Convert percent to float safely
+        try:
+            percent_float = float(percent_str.replace('%',''))
+        except ValueError:
+            percent_float = 0.0
+
+        # Build progress bar
+        bar_len = 30
+        filled_len = int(bar_len * percent_float / 100)
+        bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+        # Print line
+        sys.stdout.write(f"\r[{bar}] {percent_str} | {speed}   ")
+        sys.stdout.flush()
+
+    elif d['status'] == 'finished':
+        if key not in _finished_downloads:
+            sys.stdout.write(f"\r[{'='*30}] 100.0% | Speed:finished\n")
+            _finished_downloads.add(key)
+
+def print_help():
+    print("""
+Usage: clip <YouTube link> [options]
+
+Download audio or video from YouTube.
+
+Options:
+  -a             Download audio only (MP3)
+  -v             Download video (MP4)
+  -D <dir>       Set output directory (default: current directory)
+  -h, --help     Show this help message and exit
+
+Examples:
+  clip 'https://youtu.be/LgPEyGlUQH8' -a
+  clip 'https://youtu.be/LgPEyGlUQH8' -v -D ~/Videos
+""")
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
+        print_help()
+        sys.exit(0)
+
+    # Defaults
+    link = None
+    audio_only = False
+    video_only = False
+    save_path = os.getcwd()
+
+    # Parse args
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == "-a":
+            audio_only = True
+        elif args[i] == "-v":
+            video_only = True
+        elif args[i] == "-D" and i + 1 < len(args):
+            save_path = os.path.expanduser(args[i + 1])
+            i += 1
+        else:
+            link = args[i]
+        i += 1
+
+    if not link:
+        print_help()
+        sys.exit(0)
+
+    link = clean_link(link)
+    os.makedirs(save_path, exist_ok=True)
+
+    # yt-dlp options
+    ydl_opts = {
+        'progress_hooks': [progress_bar_hook],
+        'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
+        'noplaylist': True,
+        'quiet': True,                # no logs
+        'no_warnings': True,          # suppress warnings
+        'postprocessor_args': ['-loglevel', 'error'],  # suppress ffmpeg output
+    }
+
+    if audio_only:
+        # Audio-only download
+        ydl_opts.update({
+            'format': 'bestaudio',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+            }],
+        })
+    elif video_only:
+        # Video download (best available)
+        ydl_opts.update({
+            'format': 'bestvideo+bestaudio/best',
+            'merge_output_format': 'mp4',
+        })
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+    except KeyboardInterrupt:
+        sys.stdout.write("\nDownload canceled by user.\n")
+        sys.exit(0)
+    except yt_dlp.utils.DownloadError as e:
+        sys.stdout.write(f"\nDownload error: {e}\n")
+        sys.exit(1)
+
+    print(f"Saved to: {save_path}")
+
+if __name__ == "__main__":
+    main()
