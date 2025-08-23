@@ -1,5 +1,8 @@
 # Clip - A command to easily download Youtube videos across the terminal.
 
+Currently Available for:
+Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package managers you can install to.
+
 ## Installation?
 
 Well you can start by git cloning this repo.
@@ -27,3 +30,7 @@ And than execute the script.!
 ```
 
 And boom its installed in ur system!!!
+
+
+## Usage?!
+
