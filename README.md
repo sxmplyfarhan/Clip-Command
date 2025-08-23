@@ -13,7 +13,6 @@ Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package 
 Well you can start by git cloning this repo.
 
 ```
-
 git clone https://github.com/sxmplyfarhan/Clip-Command.git
 ```
 
