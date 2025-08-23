@@ -1,3 +1,10 @@
+# clip - YouTube downloader wrapper
+# Copyright (c) 2025 Fy
+# Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
+# See LICENSE or https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+
+
 #!/usr/bin/env bash
 set -e
 
