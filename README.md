@@ -1,4 +1,5 @@
 # Clip - A command to easily download Youtube videos across the terminal.
+<img width="917" height="184" alt="image" src="https://github.com/user-attachments/assets/a66c001f-1183-4167-9208-5a9b57f74d39" />
 
 Currently Available for:
 Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package managers you can install to.
@@ -8,6 +9,7 @@ Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package 
 Well you can start by git cloning this repo.
 
 ```
+
 git clone https://github.com/sxmplyfarhan/Clip-Command.git
 ```
 
