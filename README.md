@@ -48,4 +48,11 @@ Meanwhile for options you can do many things.
   -v             Download video (MP4)
   -D <dir>       Set output directory (default: current directory)
   -h, --help     Shows a help message.
-``` 
+```
+
+Examples:
+
+```
+  clip 'https://youtu.be/LgPEyGlUQH8' -a
+  clip 'https://youtu.be/LgPEyGlUQH8' -v -D ~/Videos
+```
