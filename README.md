@@ -43,7 +43,8 @@ clip <YouTube link> [options]
 Where it says "<YouTube link>" you must put your desired youtube video.
 Meanwhile for options you can do many things.
 
-  -a             Download audio only (MP3)
+`  -a             Download audio only (MP3)
   -v             Download video (MP4)
   -D <dir>       Set output directory (default: current directory)
   -h, --help     Shows a help message.
+`
