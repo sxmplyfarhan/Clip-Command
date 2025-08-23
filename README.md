@@ -1,5 +1,7 @@
 # Clip - A command to easily download Youtube videos across the terminal.
 
+# Screenshots:
+
 <img width="900" height="188" alt="image" src="https://github.com/user-attachments/assets/460797d2-3600-46f1-810b-bb6b77da5902" />
 
 
