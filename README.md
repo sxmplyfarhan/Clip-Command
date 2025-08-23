@@ -1,5 +1,7 @@
 # Clip - A command to easily download Youtube videos across the terminal.
-<img width="917" height="184" alt="image" src="https://github.com/user-attachments/assets/a66c001f-1183-4167-9208-5a9b57f74d39" />
+
+<img width="900" height="188" alt="image" src="https://github.com/user-attachments/assets/460797d2-3600-46f1-810b-bb6b77da5902" />
+
 
 Currently Available for:
 Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package managers you can install to.
