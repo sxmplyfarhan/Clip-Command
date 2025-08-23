@@ -34,3 +34,13 @@ And boom its installed in ur system!!!
 
 ## Usage?!
 
+Well this command is fairly simple.
+
+`
+clip <YouTube link> [options]
+`
+
+Where it says "<YouTube link>" you must put your desired youtube video.
+Meanwhile for options you can do many things.
+
+- -D
