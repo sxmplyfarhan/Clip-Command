@@ -4,39 +4,38 @@ import sys
 import re
 import yt_dlp
 
-# Regex to strip ANSI color codes
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
-# Keep track of finished downloads to avoid duplicate progress lines
+
 _finished_downloads = set()
 
 def clean_link(link):
     return re.sub(r"&list=.*", "", link)
 
 def progress_bar_hook(d):
-    key = d.get('filename', id(d))  # unique key per file
+    key = d.get('filename', id(d))  
 
     if d['status'] == 'downloading':
         if key in _finished_downloads:
-            return  # skip printing for already finished files
+            return  
 
-        # Remove ANSI color codes
+        
         percent_str = d.get('_percent_str', '0.0%')
         percent_str = ansi_escape.sub('', percent_str).strip()
         speed = d.get('_speed_str', '0B/s').strip()
 
-        # Convert percent to float safely
+       
         try:
             percent_float = float(percent_str.replace('%',''))
         except ValueError:
             percent_float = 0.0
 
-        # Build progress bar
+        
         bar_len = 30
         filled_len = int(bar_len * percent_float / 100)
         bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
-        # Print line
+       
         sys.stdout.write(f"\r[{bar}] {percent_str} | {speed}   ")
         sys.stdout.flush()
 
@@ -67,13 +66,11 @@ def main():
         print_help()
         sys.exit(0)
 
-    # Defaults
     link = None
     audio_only = False
     video_only = False
     save_path = os.getcwd()
 
-    # Parse args
     args = sys.argv[1:]
     i = 0
     while i < len(args):
@@ -95,18 +92,17 @@ def main():
     link = clean_link(link)
     os.makedirs(save_path, exist_ok=True)
 
-    # yt-dlp options
     ydl_opts = {
         'progress_hooks': [progress_bar_hook],
         'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
         'noplaylist': True,
-        'quiet': True,                # no logs
-        'no_warnings': True,          # suppress warnings
-        'postprocessor_args': ['-loglevel', 'error'],  # suppress ffmpeg output
-    }
+        'quiet': True,                
+        'no_warnings': True,          
+        'postprocessor_args': ['-loglevel', 'error'],  
+        }
 
     if audio_only:
-        # Audio-only download
+        
         ydl_opts.update({
             'format': 'bestaudio',
             'postprocessors': [{
@@ -115,7 +111,7 @@ def main():
             }],
         })
     elif video_only:
-        # Video download (best available)
+        
         ydl_opts.update({
             'format': 'bestvideo+bestaudio/best',
             'merge_output_format': 'mp4',

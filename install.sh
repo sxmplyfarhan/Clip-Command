@@ -10,7 +10,7 @@ echo "2) Ubuntu / Debian"
 echo "3) Fedora / RHEL"
 read -rp "Enter number [1-3]: " distro
 
-# Function to install dependencies per distro
+
 install_deps() {
     case $1 in
         1) # Arch
@@ -33,7 +33,7 @@ install_deps() {
 echo "Installing dependencies..."
 install_deps "$distro"
 
-# Make sure script exists
+
 if [ ! -f "./$SCRIPT_NAME" ]; then
     echo "❌ $SCRIPT_NAME not found in current directory."
     exit 1
@@ -41,7 +41,6 @@ fi
 
 chmod +x "./$SCRIPT_NAME"
 
-# Make executable and install
 chmod +x "./$SCRIPT_NAME"
 sudo cp "./$SCRIPT_NAME" "$INSTALL_PATH/$SCRIPT_NAME"
 
