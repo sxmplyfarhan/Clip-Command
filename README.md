@@ -5,6 +5,12 @@
 <img width="900" height="188" alt="image" src="https://github.com/user-attachments/assets/460797d2-3600-46f1-810b-bb6b77da5902" />
 
 
+
+# Update 1.1
+-  Improved install.sh so it autodetects distros, mind you if it isnt besides Arch, Ubuntu or fedora it will will not work.
+- added search
+-  fixed a few bugs.
+  
 Currently Available for:
 Arch linux, Ubuntu and Fedora. -- Note if your distro uses any of these package managers you can install to.
 
