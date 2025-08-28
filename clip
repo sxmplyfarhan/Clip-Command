@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-
-# clip - YouTube downloader wrapper
-# Copyright (c) 2025 Fy
-# Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
-# See LICENSE or https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
-
 import os
 import sys
 import re
 import yt_dlp
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-
 _finished_downloads = set()
 
 def clean_link(link):
@@ -19,27 +12,21 @@ def clean_link(link):
 
 def progress_bar_hook(d):
     key = d.get('filename', id(d))  
-
     if d['status'] == 'downloading':
         if key in _finished_downloads:
             return  
-
         percent_str = d.get('_percent_str', '0.0%')
         percent_str = ansi_escape.sub('', percent_str).strip()
         speed = d.get('_speed_str', '0B/s').strip()
-
         try:
             percent_float = float(percent_str.replace('%',''))
         except ValueError:
             percent_float = 0.0
-
         bar_len = 30
         filled_len = int(bar_len * percent_float / 100)
         bar = '=' * filled_len + '-' * (bar_len - filled_len)
-
         sys.stdout.write(f"\r[{bar}] {percent_str} | {speed}   ")
         sys.stdout.flush()
-
     elif d['status'] == 'finished':
         if key not in _finished_downloads:
             sys.stdout.write(f"\r[{'='*30}] 100.0% | Speed:finished\n")
@@ -68,31 +55,20 @@ def search_and_select():
     except KeyboardInterrupt:
         sys.stdout.write("\nSearch canceled by user.\n")
         sys.exit(0)
-
     if not query:
         print("No query given, exiting.")
         sys.exit(0)
-
-    search_opts = {
-        'quiet': True,
-        'extract_flat': True,
-        'skip_download': True,
-        'noplaylist': True,
-    }
-
+    search_opts = {'quiet': True, 'extract_flat': True, 'skip_download': True, 'noplaylist': True}
     with yt_dlp.YoutubeDL(search_opts) as ydl:
         search_query = f"ytsearch3:{query}"
         info = ydl.extract_info(search_query, download=False)
         entries = info.get('entries', [])
-
     if not entries:
         print("No results found.")
         sys.exit(0)
-
     print("\nTop 3 results:")
     for idx, entry in enumerate(entries, 1):
         print(f"{idx}. {entry.get('title')} ({entry.get('url')})")
-
     while True:
         try:
             choice = input("Choose a video (1-3) or 'q' to cancel: ").strip()
@@ -103,7 +79,7 @@ def search_and_select():
             if 1 <= choice_int <= len(entries):
                 return f"https://www.youtube.com/watch?v={entries[choice_int-1]['id']}"
             else:
-                print(f"Invalid choice. Enter a number between 1 and {len(entries)}, or 'q' to quit.")
+                print(f"Invalid choice. Enter 1-{len(entries)} or 'q'.")
         except ValueError:
             print("Invalid input. Enter a number or 'q' to quit.")
         except KeyboardInterrupt:
@@ -130,7 +106,7 @@ def main():
         elif args[i] == "-D" and i + 1 < len(args):
             save_path = os.path.expanduser(args[i + 1])
             i += 1
-        elif not link:  # first non-option arg → assume it's the link
+        elif not link:
             link = args[i]
         i += 1
 
@@ -145,7 +121,7 @@ def main():
                     print_help()
                     sys.exit(0)
                 else:
-                    print("Please enter 'y' or 'n'.")
+                    print("Enter 'y' or 'n'.")
             except KeyboardInterrupt:
                 sys.stdout.write("\nCanceled by user.\n")
                 sys.exit(0)
@@ -153,6 +129,7 @@ def main():
     link = clean_link(link)
     os.makedirs(save_path, exist_ok=True)
 
+    # Base options
     ydl_opts = {
         'progress_hooks': [progress_bar_hook],
         'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
@@ -163,14 +140,17 @@ def main():
     }
 
     if audio_only:
+        # Audio extraction (MP3)
         ydl_opts.update({
-            'format': 'bestaudio',
+            'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
+                'preferredquality': '192',
             }],
         })
-    elif video_only:
+    else:
+        # Default video download (MP4)
         ydl_opts.update({
             'format': 'bestvideo+bestaudio/best',
             'merge_output_format': 'mp4',
@@ -190,4 +170,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
