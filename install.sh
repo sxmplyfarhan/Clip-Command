@@ -11,46 +11,66 @@ set -e
 SCRIPT_NAME="clip"
 INSTALL_PATH="/usr/local/bin"
 
-echo "Which distro are you using?"
-echo "1) Arch / Manjaro"
-echo "2) Ubuntu / Debian"
-echo "3) Fedora / RHEL"
-read -rp "Enter number [1-3]: " distro
+# Detect distro
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO_ID=$ID
+else
+    echo "Cannot detect OS."
+    exit 1
+fi
 
+# Check for existing dependencies
+NEED_PYTHON=0
+NEED_YTDLP=0
+NEED_FFMPEG=0
+
+command -v python3 >/dev/null 2>&1 || NEED_PYTHON=1
+command -v yt-dlp >/dev/null 2>&1 || NEED_YTDLP=1
+command -v ffmpeg >/dev/null 2>&1 || NEED_FFMPEG=1
 
 install_deps() {
-    case $1 in
-        1) # Arch
-            sudo pacman -S --noconfirm python yt-dlp ffmpeg
+    echo "Installing missing dependencies..."
+    case "$DISTRO_ID" in
+        arch|manjaro)
+            sudo pacman -Syu --noconfirm $( [ $NEED_PYTHON -eq 1 ] && echo python ) \
+                                   $( [ $NEED_YTDLP -eq 1 ] && echo yt-dlp ) \
+                                   $( [ $NEED_FFMPEG -eq 1 ] && echo ffmpeg )
             ;;
-        2) # Debian/Ubuntu
+        ubuntu|debian)
             sudo apt update
-            sudo apt install -y python3 python3-pip yt-dlp ffmpeg
+            sudo apt install -y $( [ $NEED_PYTHON -eq 1 ] && echo python3 python3-pip ) \
+                                $( [ $NEED_YTDLP -eq 1 ] && echo yt-dlp ) \
+                                $( [ $NEED_FFMPEG -eq 1 ] && echo ffmpeg )
             ;;
-        3) # Fedora
-            sudo dnf install -y python3 python3-pip yt-dlp ffmpeg
+        fedora|rhel|centos)
+            sudo dnf install -y $( [ $NEED_PYTHON -eq 1 ] && echo python3 python3-pip ) \
+                                $( [ $NEED_YTDLP -eq 1 ] && echo yt-dlp ) \
+                                $( [ $NEED_FFMPEG -eq 1 ] && echo ffmpeg )
             ;;
         *)
-            echo "❌ Invalid option."
+            echo "Unsupported OS: $DISTRO_ID"
             exit 1
             ;;
     esac
 }
 
-echo "Installing dependencies..."
-install_deps "$distro"
+if [ $NEED_PYTHON -eq 1 ] || [ $NEED_YTDLP -eq 1 ] || [ $NEED_FFMPEG -eq 1 ]; then
+    install_deps
+else
+    echo "All dependencies are already installed."
+fi
 
-
+# Check if the script exists in current directory
 if [ ! -f "./$SCRIPT_NAME" ]; then
-    echo "❌ $SCRIPT_NAME not found in current directory."
+    echo "$SCRIPT_NAME not found in current directory."
     exit 1
 fi
 
-chmod +x "./$SCRIPT_NAME"
-
+# Make executable and copy to /usr/local/bin
 chmod +x "./$SCRIPT_NAME"
 sudo cp "./$SCRIPT_NAME" "$INSTALL_PATH/$SCRIPT_NAME"
 
 echo "Installation complete!"
 echo "You can now run it from anywhere:"
-echo "   $ $SCRIPT_NAME 'youtube_link' -a | -v"
+echo "   $ $SCRIPT_NAME 'youtube_link' -a | -v -D <dir>"
