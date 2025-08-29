@@ -58,7 +58,7 @@ The installer (`install.sh`) handles most dependencies automatically. If install
 
 ## :zap: Installation
 
-```
+``` bash 
 # Git clone the repository
 git clone https://github.com/sxmplyfarhan/Clip-Command.git
 
