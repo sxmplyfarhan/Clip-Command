@@ -2,19 +2,25 @@
 import os
 import sys
 import re
+import json
 import yt_dlp
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 _finished_downloads = set()
 
-def clean_link(link):
-    return re.sub(r"&list=.*", "", link)
+# ====== Config / Credentials Path ======
+CONFIG_DIR = os.path.expanduser("~/.config/clip")
+os.makedirs(CONFIG_DIR, exist_ok=True)
+CRED_PATH = os.path.join(CONFIG_DIR, "clip_credentials.json")
 
+# ====== Helpers ======
 def progress_bar_hook(d):
-    key = d.get('filename', id(d))  
+    key = d.get('filename', id(d))
     if d['status'] == 'downloading':
         if key in _finished_downloads:
-            return  
+            return
         percent_str = d.get('_percent_str', '0.0%')
         percent_str = ansi_escape.sub('', percent_str).strip()
         speed = d.get('_speed_str', '0B/s').strip()
@@ -32,28 +38,123 @@ def progress_bar_hook(d):
             sys.stdout.write(f"\r[{'='*30}] 100.0% | Speed:finished\n")
             _finished_downloads.add(key)
 
-def print_help():
-    print("""
-Usage: clip <YouTube link> [options]
+def clean_link(link):
+    return re.sub(r"&list=.*", "", link)
 
-Download audio or video from YouTube.
+def is_spotify_playlist(link):
+    return "open.spotify.com/playlist/" in link
 
-Options:
-  -a             Download audio only (MP3)
-  -v             Download video (MP4)
-  -D <dir>       Set output directory (default: current directory)
-  -h, --help     Show this help message and exit
+def is_youtube_playlist(link):
+    return "list=" in link
 
-Examples:
-  clip 'https://youtu.be/LgPEyGlUQH8' -a
-  clip 'https://youtu.be/LgPEyGlUQH8' -v -D ~/Videos
-""")
+def get_playlist_info(link):
+    opts = {'quiet': True, 'extract_flat': True, 'skip_download': True}
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(link, download=False)
+    playlist_id = info.get('id')
+    entries = info.get('entries', [])
+    total = len(entries)
+    titles = [e.get('title') for e in entries[:5]]  # show first 5
+    return {"id": playlist_id, "total": total, "titles": titles, "entries": entries}
 
+# ====== Spotify login ======
+def login():
+    if os.path.exists(CRED_PATH):
+        print(f"Already logged in. Credentials found at {CRED_PATH}")
+        return
+
+    print("=== Spotify Login ===")
+    print("To download Spotify playlists you need a Spotify Client ID and Secret.")
+    print("Steps:")
+    print("1. Go to https://developer.spotify.com/dashboard/")
+    print("2. Log in and create a new app.")
+    print("3. Copy your Client ID and Client Secret below.")
+    try:
+        client_id = input("Enter Spotify Client ID: ").strip()
+        client_secret = input("Enter Spotify Client Secret: ").strip()
+    except KeyboardInterrupt:
+        print("\nLogin canceled by user. Login failed. Try again!")
+        sys.exit(0)
+
+    if not client_id or not client_secret:
+        print("Login failed: Missing Client ID or Secret.")
+        sys.exit(1)
+
+    creds = {"client_id": client_id, "client_secret": client_secret}
+    with open(CRED_PATH, "w") as f:
+        json.dump(creds, f)
+    print(f"Spotify credentials saved to {CRED_PATH}. You can now download Spotify playlists!")
+
+def get_spotify_client():
+    if not os.path.exists(CRED_PATH):
+        print("No Spotify login found. Please run: clip login")
+        sys.exit(1)
+    with open(CRED_PATH) as f:
+        creds = json.load(f)
+    auth_manager = SpotifyClientCredentials(
+        client_id=creds["client_id"],
+        client_secret=creds["client_secret"]
+    )
+    return spotipy.Spotify(auth_manager=auth_manager)
+
+def fetch_spotify_playlist_tracks(sp, playlist_url):
+    try:
+        playlist_id = playlist_url.split("/")[-1].split("?")[0]
+        results = sp.playlist_items(playlist_id)
+        tracks = []
+        while results:
+            for item in results['items']:
+                track = item['track']
+                if track:
+                    tracks.append(f"{track['name']} {track['artists'][0]['name']}")
+            if results['next']:
+                results = sp.next(results)
+            else:
+                results = None
+        return tracks
+    except Exception as e:
+        print(f"Spotify error: {e}")
+        sys.exit(1)
+
+# ====== Download YouTube ======
+def download_youtube(link, audio_only=False, save_path="."):
+    os.makedirs(save_path, exist_ok=True)
+    ydl_opts = {
+        'progress_hooks': [progress_bar_hook],
+        'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
+        'quiet': True,
+        'no_warnings': True,
+        'postprocessor_args': ['-loglevel', 'error'],
+        'merge_output_format': 'mp4'
+    }
+    if audio_only:
+        ydl_opts.update({
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        })
+    else:
+        ydl_opts.update({
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+        })
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+    except yt_dlp.utils.DownloadError as e:
+        print(f"\nDownload error: {e}")
+    except KeyboardInterrupt:
+        print("\nDownload canceled by user.")
+        sys.exit(0)
+
+# ====== Search YouTube fallback ======
 def search_and_select():
     try:
         query = input("Enter search query: ").strip()
     except KeyboardInterrupt:
-        sys.stdout.write("\nSearch canceled by user.\n")
+        print("\nSearch canceled by user.")
         sys.exit(0)
     if not query:
         print("No query given, exiting.")
@@ -77,118 +178,159 @@ def search_and_select():
                 sys.exit(0)
             choice_int = int(choice)
             if 1 <= choice_int <= len(entries):
-                return f"https://www.youtube.com/watch?v={entries[choice_int-1]['id']}"
+                return entries[choice_int-1]['url']
             else:
                 print(f"Invalid choice. Enter 1-{len(entries)} or 'q'.")
         except ValueError:
             print("Invalid input. Enter a number or 'q' to quit.")
         except KeyboardInterrupt:
-            sys.stdout.write("\nCanceled by user.\n")
+            print("\nCanceled by user.")
             sys.exit(0)
 
-def check_playlist_option(link):
-    """If link is part of a playlist, ask user whether to download video or playlist."""
-    if "list=" in link and "watch?v=" in link:
-        playlist_id = re.search(r"list=([a-zA-Z0-9_-]+)", link)
-        if playlist_id:
-            while True:
-                choice = input(
-                    f"\nThis video is part of a playlist (ID: {playlist_id.group(1)}).\n"
-                    "Do you want to download:\n"
-                    "  1. Just this video\n"
-                    "  2. The whole playlist\n"
-                    "Enter choice (1/2): "
-                ).strip()
-                if choice == "1":
-                    return True   # single video
-                elif choice == "2":
-                    return False  # playlist
-                else:
-                    print("Invalid input. Please enter 1 or 2.")
-    return True  # default single video
+# ====== Help ======
+def print_help():
+    print("""
 
+⚠️  Legal Notice
+
+This tool is intended for personal use only. Downloading videos or music from YouTube or Spotify may violate their Terms of Service and/or copyright law in your country.
+
+By using this tool, you agree to use it responsibly and not to distribute downloaded content.
+
+The author is not responsible for any misuse or legal consequences.
+
+
+Usage: clip <link> [options]
+
+Commands:
+  login           Log in to Spotify (required for Spotify playlists)
+
+Options:
+  -a             Audio only (MP3)  (ignored for Spotify playlists)
+  -v             Video (MP4)       (ignored for Spotify playlists)
+  -D <dir>       Output directory
+  -h, --help     Show this help
+
+Notes:
+- YouTube links can be single videos or playlists.
+- Spotify playlists require a login:
+  1. Go to https://developer.spotify.com/dashboard/
+  2. Create an app and get Client ID & Secret
+  3. Run: clip login
+- Spotify playlists will be downloaded via YouTube search (audio only)
+- Example usage:
+    clip https://youtu.be/LgPEyGlUQH8 -a
+    clip https://open.spotify.com/playlist/XXXXXXXX -D ~/Music
+""")
+
+# ====== Main CLI ======
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
-        print_help()
-        sys.exit(0)
+    try:
+        if len(sys.argv) < 2 or sys.argv[1] in ("-h","--help"):
+            print_help()
+            sys.exit(0)
 
-    link = None
-    audio_only = False
-    save_path = os.getcwd()
+        if sys.argv[1] == "login":
+            login()
+            sys.exit(0)
 
-    args = sys.argv[1:]
-    i = 0
-    while i < len(args):
-        if args[i] == "-a":
-            audio_only = True
-        elif args[i] == "-v":
-            pass  # video-only is default behavior anyway
-        elif args[i] == "-D" and i + 1 < len(args):
-            save_path = os.path.expanduser(args[i + 1])
-            i += 1
-        elif not link:
-            link = args[i]
-        i += 1
+        args = sys.argv[1:]
+        save_path = "."
+        audio_only = "-a" in args
+        video_only = "-v" in args
 
-    if not link or not link.startswith(("http://", "https://")):
-        while True:
-            try:
-                resp = input("No valid link given. Do you want to search YouTube instead? (y/n): ").strip().lower()
-                if resp == 'y':
-                    link = search_and_select()
-                    break
-                elif resp == 'n':
-                    print_help()
-                    sys.exit(0)
-                else:
-                    print("Enter 'y' or 'n'.")
-            except KeyboardInterrupt:
-                sys.stdout.write("\nCanceled by user.\n")
+        if "-D" in args:
+            idx = args.index("-D")
+            if idx+1 < len(args):
+                save_path = os.path.expanduser(args[idx+1])
+
+# Determine link argument
+        link = None
+        for arg in args:
+            if not arg.startswith("-"):
+                link = arg
+                break
+
+        if not link:
+            # No URL provided, fallback to YouTube search
+            resp = input("No valid link given. Do you want to search YouTube instead? (y/n): ").strip().lower()
+            if resp == 'y':
+                link = search_and_select()
+            else:
+                print_help()
                 sys.exit(0)
 
-    # Check for playlist
-    noplaylist_flag = check_playlist_option(link)
-    if noplaylist_flag:
-        link = clean_link(link)
+        # Spotify flow
+        if is_spotify_playlist(link):
+            if not os.path.exists(CRED_PATH):
+                print("Spotify playlist detected!")
+                print("Please run: clip login to provide Client ID & Secret.")
+                sys.exit(1)
+            sp = get_spotify_client()
+            tracks = fetch_spotify_playlist_tracks(sp, link)
+            print(f"Playlist contains {len(tracks)} tracks. First 5:")
+            for i, t in enumerate(tracks[:5], 1):
+                print(f"{i}. {t}")
 
-    os.makedirs(save_path, exist_ok=True)
+            # Ask user how many tracks to download
+            while True:
+                choice = input(f"Enter number of tracks to download (1-{len(tracks)}) or 'a' for all: ").strip().lower()
+                if choice == 'a':
+                    selected_tracks = tracks
+                    break
+                elif choice.isdigit():
+                    n = int(choice)
+                    if 1 <= n <= len(tracks):
+                        selected_tracks = tracks[:n]
+                        break
+                    else:
+                        print(f"Enter a number between 1 and {len(tracks)}, or 'a' for all.")
+                else:
+                    print("Invalid input. Enter a number or 'a'.")
 
-    # Base options
-    ydl_opts = {
-        'progress_hooks': [progress_bar_hook],
-        'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
-        'noplaylist': noplaylist_flag,
-        'quiet': True,
-        'no_warnings': True,
-        'postprocessor_args': ['-loglevel', 'error'],
-    }
+            # Download selected tracks via YouTube
+            for track in selected_tracks:
+                print(f"\nDownloading: {track}")
+                download_youtube(f"ytsearch1:{track}", audio_only=True, save_path=save_path)
+            print(f"\nAll tracks saved to: {os.path.abspath(save_path)}")
+            sys.exit(0)
 
-    if audio_only:
-        ydl_opts.update({
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        })
-    else:
-        ydl_opts.update({
-            'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-        })
+        # YouTube playlist prompt
+        if is_youtube_playlist(link):
+            info = get_playlist_info(link)
+            print(f"This video is part of a playlist (ID: {info['id']}).")
+            print(f"Playlist contains {info['total']} videos. First few titles:")
+            for i, title in enumerate(info['titles'], 1):
+                print(f"{i}. {title}")
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
+            while True:
+                choice = input(f"Enter number of videos to download (1-{info['total']}) or 'a' for all: ").strip().lower()
+                if choice == 'a':
+                    playlist_videos = info['entries']
+                    break
+                elif choice.isdigit():
+                    n = int(choice)
+                    if 1 <= n <= info['total']:
+                        playlist_videos = info['entries'][:n]
+                        break
+                    else:
+                        print(f"Enter a number between 1 and {info['total']}, or 'a' for all.")
+                else:
+                    print("Invalid input. Enter a number or 'a'.")
+
+            for vid in playlist_videos:
+                print(f"\nDownloading: {vid['title']}")
+                download_youtube(vid['url'], audio_only=audio_only, save_path=save_path)
+            print(f"\nAll tracks saved to: {os.path.abspath(save_path)}")
+            sys.exit(0)
+
+        # Single YouTube video
+        download_youtube(link, audio_only=audio_only, save_path=save_path)
+        print(f"\nDownloaded to: {os.path.abspath(save_path)}")
+
     except KeyboardInterrupt:
-        sys.stdout.write("\nDownload canceled by user.\n")
+        print("\nOperation canceled by user.")
         sys.exit(0)
-    except yt_dlp.utils.DownloadError as e:
-        sys.stdout.write(f"\nDownload error: {e}\n")
-        sys.exit(1)
-
-    print(f"\nSaved to: {save_path}")
 
 if __name__ == "__main__":
     main()
