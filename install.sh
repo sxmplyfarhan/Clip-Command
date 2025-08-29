@@ -7,59 +7,97 @@ INSTALL_PATH="/usr/local/bin"
 REPO_URL="https://github.com/sxmplyfarhan/Clip-Command.git"
 INSTALL_DIR="$HOME/.clip-command"
 
-# ===== DETECT OS / PACKAGE MANAGER =====
+# ===== DETECT PACKAGE MANAGER =====
 PACKAGE_MANAGER=""
-if command -v apt &>/dev/null; then
-    PACKAGE_MANAGER="apt"
-elif command -v dnf &>/dev/null; then
-    PACKAGE_MANAGER="dnf"
-elif command -v pacman &>/dev/null; then
-    PACKAGE_MANAGER="pacman"
-elif command -v zypper &>/dev/null; then
-    PACKAGE_MANAGER="zypper"
-elif command -v apk &>/dev/null; then
-    PACKAGE_MANAGER="apk"
+if command -v apt &>/dev/null; then PACKAGE_MANAGER="apt"
+elif command -v dnf &>/dev/null; then PACKAGE_MANAGER="dnf"
+elif command -v pacman &>/dev/null; then PACKAGE_MANAGER="pacman"; fi
+
+if [ -z "$PACKAGE_MANAGER" ]; then
+    echo "Unsupported Linux distro. Please install dependencies manually."
+    exit 1
 fi
 
-# ===== SYSTEM DEPENDENCIES =====
-SYSTEM_DEPS=(python3 git ffmpeg curl)
-
+# ===== INSTALL SYSTEM DEPENDENCIES =====
 install_system_deps() {
-    echo "Installing system dependencies: ${SYSTEM_DEPS[*]}"
+    echo "Installing system dependencies..."
     case "$PACKAGE_MANAGER" in
         apt)
             sudo apt update
-            sudo apt install -y "${SYSTEM_DEPS[@]}" python3-pip
+            sudo apt install -y python3 git ffmpeg curl make gcc pkg-config python3-venv
             ;;
         dnf)
-            sudo dnf install -y "${SYSTEM_DEPS[@]}" python3-pip
+            sudo dnf install -y python3 git ffmpeg curl make gcc pkg-config python3-venv
             ;;
         pacman)
-            sudo pacman -Syu --noconfirm "${SYSTEM_DEPS[@]}" python-pip
-            ;;
-        zypper)
-            sudo zypper install -y "${SYSTEM_DEPS[@]}" python3-pip
-            ;;
-        apk)
-            sudo apk add --no-cache "${SYSTEM_DEPS[@]}" py3-pip
-            ;;
-        *)
-            echo "No supported package manager detected. Skipping system dependencies."
+            sudo pacman -Syu --noconfirm python git ffmpeg curl make gcc pkgconf
+            # Install yay if missing
+            if ! command -v yay &>/dev/null; then
+                echo "Installing yay AUR helper..."
+                cd /tmp
+                git clone https://aur.archlinux.org/yay.git
+                cd yay
+                makepkg -si --noconfirm
+            fi
             ;;
     esac
 }
 
-# Install system deps if package manager exists
-if [ -n "$PACKAGE_MANAGER" ]; then
-    install_system_deps
-else
-    echo "Package manager not detected. System dependencies must be installed manually."
-fi
+install_system_deps
+
+# ===== INSTALL SPOTIPY AND YT-DLP =====
+install_python_tools() {
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            # Arch: Spotipy via yay
+            if ! pacman -Qs python-spotipy >/dev/null; then
+                yay -S --noconfirm python-spotipy
+            fi
+            # yt-dlp already installed via pacman; skip if present
+            if ! command -v yt-dlp &>/dev/null; then
+                echo "yt-dlp not found! Install via pacman or yay."
+                exit 1
+            fi
+            ;;
+        apt)
+            # Debian/Ubuntu
+            if ! dpkg -s python3-spotipy >/dev/null 2>&1; then
+                echo "python3-spotipy not found in repos. Installing from source..."
+                cd /tmp
+                git clone https://github.com/plamere/spotipy.git
+                cd spotipy
+                python3 setup.py install --user
+            fi
+            if ! command -v yt-dlp &>/dev/null; then
+                echo "yt-dlp not found in repos. Installing standalone binary..."
+                sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+                sudo chmod a+rx /usr/local/bin/yt-dlp
+            fi
+            ;;
+        dnf)
+            # Fedora
+            if ! rpm -q python3-spotipy >/dev/null 2>&1; then
+                echo "python3-spotipy not found in repos. Installing from source..."
+                cd /tmp
+                git clone https://github.com/plamere/spotipy.git
+                cd spotipy
+                python3 setup.py install --user
+            fi
+            if ! command -v yt-dlp &>/dev/null; then
+                echo "yt-dlp not found in repos. Installing standalone binary..."
+                sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+                sudo chmod a+rx /usr/local/bin/yt-dlp
+            fi
+            ;;
+    esac
+}
+
+install_python_tools
 
 # ===== INSTALL / UPDATE CLIP-COMMAND =====
 if [ -d "$INSTALL_DIR" ]; then
-    echo "Clip-Command is already installed."
-    read -p "Do you want to update it to the latest version? [y/N]: " choice
+    echo "Clip-Command already installed."
+    read -p "Do you want to update it? [y/N]: " choice
     if [[ "$choice" =~ ^[Yy]$ ]]; then
         cd "$INSTALL_DIR"
         git pull origin main
@@ -75,34 +113,6 @@ fi
 # ===== SYMLINK =====
 sudo ln -sf "$INSTALL_DIR/$SCRIPT_NAME" "$INSTALL_PATH/$SCRIPT_NAME"
 
-# ===== PYTHON DEPENDENCIES =====
-echo "Installing Python dependencies..."
-# Spotipy
-if command -v yay &>/dev/null && [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
-    echo "Installing Spotipy via yay (Arch/Manjaro)..."
-    yay -S --noconfirm python-spotipy
-else
-    echo "Installing Spotipy via pip3..."
-    pip3 install --user spotipy yt-dlp
-fi
-
-# ===== FALLBACK FOR YT-DLP & FFMPEG IF MISSING =====
-command -v yt-dlp >/dev/null 2>&1 || {
-    echo "yt-dlp not found. Installing latest release..."
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$HOME/.local/bin/yt-dlp"
-    chmod +x "$HOME/.local/bin/yt-dlp"
-}
-command -v ffmpeg >/dev/null 2>&1 || {
-    echo "ffmpeg not found. Installing static build..."
-    FFMPEG_URL=$(curl -s https://johnvansickle.com/ffmpeg/releases/ | grep -o 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-.*-amd64-static.tar.xz' | head -n1)
-    curl -L "$FFMPEG_URL" -o "/tmp/ffmpeg.tar.xz"
-    tar -xf /tmp/ffmpeg.tar.xz -C /tmp
-    sudo cp /tmp/ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/
-    sudo cp /tmp/ffmpeg-*-amd64-static/ffprobe /usr/local/bin/
-}
-
-echo "✅ Clip-Command installation complete!"
-echo "You can now run it anywhere using:"
+echo "Clip-Command installation complete!"
+echo "You can run it globally using:"
 echo "   $ clip <link> [-a | -v] [-D <directory>]"
-
-
