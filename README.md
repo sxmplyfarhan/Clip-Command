@@ -73,3 +73,25 @@ chmod +x install.sh
 ```
 
 Boom its installed!
+
+# Usage: clip <link> [options]
+
+Commands:
+  login           Log in to Spotify (required for Spotify playlists)
+
+Options:
+  -a             Audio only (MP3)  (ignored for Spotify playlists)
+  -v             Video (MP4)       (ignored for Spotify playlists)
+  -D <dir>       Output directory
+  -h, --help     Show this help message.
+
+Notes:
+- YouTube links can be single videos or playlists.
+- Spotify playlists require a login:
+  1. Go to https://developer.spotify.com/dashboard/
+  2. Create an app and get Client ID & Secret
+  3. Run: clip login
+- Spotify playlists will be downloaded via YouTube search (audio only)
+- Example usage:
+    clip https://youtu.be/LgPEyGlUQH8 -a
+    clip https://open.spotify.com/playlist/XXXXXXXX -D ~/Music
