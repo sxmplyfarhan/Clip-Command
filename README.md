@@ -94,5 +94,7 @@ Notes:
   3. Run: clip login
 - Spotify playlists will be downloaded via YouTube search (audio only)
 - Example usage:
+  ```
     clip https://youtu.be/LgPEyGlUQH8 -a
     clip https://open.spotify.com/playlist/XXXXXXXX -D ~/Music
+  ```
