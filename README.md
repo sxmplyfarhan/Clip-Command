@@ -4,6 +4,7 @@ Clip-Command is a command-line tool to **download music or videos** from YouTube
 It bridges services: Spotify provides tracklists, YouTube provides the media, and `ffmpeg` converts it to MP3 or MP4.  
 It’s interactive, flexible, and designed for personal use.
 
+
 ----
 
 # ⚠️  Legal Notice
@@ -52,7 +53,16 @@ The installer (`install.sh`) handles most dependencies automatically. If install
 - Debian/Ubuntu → `apt`
 - Fedora → `dnf`
 - Arch Linux → `pacman` + `yay` for Spotipy
-- Windows/macOS → manual dependency setup for Python libraries and ffmpeg
+
+### When macos and windows? 
+- MacOS and Windows will be supported soon but when i find alternatives to what i used.
+### What about android and ios?
+- I dont consider them. it will be mostly a hassle. So i doubt it.
+### Why?
+- i didnt want to make go on a sketchy website and didnt want to sue a complex ass command.
+
+
+
 
 ---
 
