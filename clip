@@ -86,6 +86,27 @@ def search_and_select():
             sys.stdout.write("\nCanceled by user.\n")
             sys.exit(0)
 
+def check_playlist_option(link):
+    """If link is part of a playlist, ask user whether to download video or playlist."""
+    if "list=" in link and "watch?v=" in link:
+        playlist_id = re.search(r"list=([a-zA-Z0-9_-]+)", link)
+        if playlist_id:
+            while True:
+                choice = input(
+                    f"\nThis video is part of a playlist (ID: {playlist_id.group(1)}).\n"
+                    "Do you want to download:\n"
+                    "  1. Just this video\n"
+                    "  2. The whole playlist\n"
+                    "Enter choice (1/2): "
+                ).strip()
+                if choice == "1":
+                    return True   # single video
+                elif choice == "2":
+                    return False  # playlist
+                else:
+                    print("Invalid input. Please enter 1 or 2.")
+    return True  # default single video
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print_help()
@@ -93,7 +114,6 @@ def main():
 
     link = None
     audio_only = False
-    video_only = False
     save_path = os.getcwd()
 
     args = sys.argv[1:]
@@ -102,7 +122,7 @@ def main():
         if args[i] == "-a":
             audio_only = True
         elif args[i] == "-v":
-            video_only = True
+            pass  # video-only is default behavior anyway
         elif args[i] == "-D" and i + 1 < len(args):
             save_path = os.path.expanduser(args[i + 1])
             i += 1
@@ -126,21 +146,24 @@ def main():
                 sys.stdout.write("\nCanceled by user.\n")
                 sys.exit(0)
 
-    link = clean_link(link)
+    # Check for playlist
+    noplaylist_flag = check_playlist_option(link)
+    if noplaylist_flag:
+        link = clean_link(link)
+
     os.makedirs(save_path, exist_ok=True)
 
     # Base options
     ydl_opts = {
         'progress_hooks': [progress_bar_hook],
         'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
-        'noplaylist': True,
+        'noplaylist': noplaylist_flag,
         'quiet': True,
         'no_warnings': True,
         'postprocessor_args': ['-loglevel', 'error'],
     }
 
     if audio_only:
-        # Audio extraction (MP3)
         ydl_opts.update({
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -150,7 +173,6 @@ def main():
             }],
         })
     else:
-        # Default video download (MP4)
         ydl_opts.update({
             'format': 'bestvideo+bestaudio/best',
             'merge_output_format': 'mp4',
@@ -166,7 +188,7 @@ def main():
         sys.stdout.write(f"\nDownload error: {e}\n")
         sys.exit(1)
 
-    print(f"Saved to: {save_path}")
+    print(f"\nSaved to: {save_path}")
 
 if __name__ == "__main__":
     main()
