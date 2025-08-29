@@ -76,6 +76,7 @@ Boom its installed!
 
 # Usage: clip <link> [options]
 
+```
 Commands:
   login           Log in to Spotify (required for Spotify playlists)
 
@@ -84,7 +85,7 @@ Options:
   -v             Video (MP4)       (ignored for Spotify playlists)
   -D <dir>       Output directory
   -h, --help     Show this help message.
-
+```
 Notes:
 - YouTube links can be single videos or playlists.
 - Spotify playlists require a login:
